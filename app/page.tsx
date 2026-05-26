@@ -3,14 +3,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
 
-// Global Type Declaration for Speech API
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
-}
-
 function OmegaCore({ isThinking }: { isThinking: boolean }) {
   return (
     <mesh>
@@ -32,14 +24,12 @@ export default function JarvisOmega() {
   const [input, setInput] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [cameraOn, setCameraOn] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [showSettings, setShowSettings] = useState(false);
-  
+
   const [voiceSpeed, setVoiceSpeed] = useState(1.05);
   const [voicePitch, setVoicePitch] = useState(1.0);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto Save History
@@ -64,15 +54,15 @@ export default function JarvisOmega() {
 
   const sendCommand = async (text: string) => {
     if (!text.trim()) return;
-    
+
     const userMessage = { type: 'user', text };
     setHistory(prev => [...prev, userMessage]);
-    
+
     setIsThinking(true);
     setMessage("🧠 NEURAL CORE PROCESSING...");
 
     try {
-      const res = await fetch("http://localhost:8000/command", {
+      const res = await fetch("/api/omega", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text })
@@ -80,24 +70,24 @@ export default function JarvisOmega() {
 
       const data = await res.json();
       const omegaResponse = data.response;
-      
+
       const omegaMessage = { type: 'omega', text: omegaResponse };
       setHistory(prev => [...prev, omegaMessage]);
       setMessage(omegaResponse);
       speak(omegaResponse);
     } catch (err) {
-      setMessage("❌ Cannot connect to backend. Is it running?");
+      setMessage("❌ Sorry, I'm having trouble connecting right now.");
     }
-    
+
     setIsThinking(false);
     setInput("");
+    inputRef.current?.focus();
   };
 
   const startListening = () => {
     const SpeechRecognitionAPI = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
-    
     if (!SpeechRecognitionAPI) {
-      alert("Please use Google Chrome for voice recognition");
+      alert("Please use Google Chrome for voice input");
       return;
     }
 
@@ -109,7 +99,7 @@ export default function JarvisOmega() {
     recognition.onresult = (event: any) => {
       const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
       if (transcript.includes("hey omega") || transcript.includes("hello omega")) {
-        setMessage("🎤 Wake word detected! Listening...");
+        setMessage("🎤 Listening...");
         setTimeout(() => {
           const cmdRec = new SpeechRecognitionAPI();
           cmdRec.lang = 'en-US';
@@ -123,19 +113,10 @@ export default function JarvisOmega() {
     setIsListening(true);
   };
 
-  const toggleCamera = async () => {
-    if (cameraOn) setCameraOn(false);
-    else {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setCameraOn(true);
-    }
-  };
-
   const clearHistory = () => {
     setHistory([]);
     localStorage.removeItem('omegaHistory');
-    setMessage("✅ History cleared.");
+    setMessage("✅ Conversation history cleared.");
   };
 
   return (
@@ -149,7 +130,7 @@ export default function JarvisOmega() {
           <div className="text-3xl animate-pulse">⚡</div>
           <div>
             <div className="text-2xl tracking-[6px] font-bold text-white">JARVIS OMEGA</div>
-            <div className="text-xs text-cyan-400 -mt-1">GOD MODE • NEON v1.0</div>
+            <div className="text-xs text-cyan-400 -mt-1">GOD MODE • CLOUD v1.0</div>
           </div>
         </div>
         <div className="flex items-center gap-6">
@@ -174,7 +155,7 @@ export default function JarvisOmega() {
         </Canvas>
       </div>
 
-      {/* Quick Commands & Settings */}
+      {/* Settings Panel */}
       {showSettings && (
         <div className="absolute top-24 right-10 w-96 glass-panel border border-cyan-400/40 rounded-3xl p-8 z-50">
           <h2 className="text-2xl mb-8 text-white">SYSTEM SETTINGS</h2>
@@ -197,7 +178,7 @@ export default function JarvisOmega() {
       <div className="absolute top-28 left-10 w-96 h-[440px] glass-panel border border-cyan-400/30 rounded-3xl p-6 overflow-y-auto z-40">
         <div className="text-xs text-cyan-400 mb-4">CONVERSATION LOG</div>
         {history.length === 0 ? (
-          <p className="text-cyan-500/70 text-center mt-12">Say "Hey Omega" to begin...</p>
+          <p className="text-cyan-500/70 text-center mt-12">Say "Hey Omega" or type a command...</p>
         ) : (
           history.map((msg, i) => (
             <div key={i} className={`mb-5 ${msg.type === 'user' ? 'text-right' : ''}`}>
@@ -222,7 +203,7 @@ export default function JarvisOmega() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && sendCommand(input)}
-            placeholder='Type or say "Hey Omega"...'
+            placeholder='Type command or say "Hey Omega"...'
             className="flex-1 glass-input border border-cyan-400/40 rounded-3xl px-8 py-6 text-lg focus:outline-none focus:border-cyan-400"
           />
 
